@@ -76,11 +76,7 @@ function doLogin(u) {
   window.CU = u;
   sessionStorage.setItem('gtp_cu', u.id);
 
-  // Set role class on body for CSS theming
-  document.body.className = 'role-' + u.ruolo;
-
   document.getElementById('authScreen').style.display = 'none';
-  document.getElementById('landingPage') && (document.getElementById('landingPage').style.display = 'none');
   const app = document.getElementById('appShell');
   app.style.display = 'flex';
   app.style.flexDirection = 'column';
