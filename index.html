@@ -2,9 +2,12 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>GymTrack PRO</title>
 <meta name="theme-color" content="#0a0a0a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
@@ -21,19 +24,15 @@
     <button class="atab active" id="tabLogin" onclick="switchAuth('login')">Accedi</button>
     <button class="atab" id="tabRegister" onclick="switchAuth('register')">Registrati</button>
   </div>
-
-  <!-- LOGIN -->
   <div id="loginForm">
     <div class="fg"><label>Email</label><input class="inp" type="email" id="lEmail" placeholder="tua@email.com" onkeydown="if(event.key==='Enter')login()"></div>
     <div class="fg"><label>Password</label><input class="inp" type="password" id="lPwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()"></div>
     <div style="text-align:right;margin-bottom:1rem"><span style="font-size:0.68rem;color:var(--muted);cursor:pointer;text-decoration:underline" onclick="showForgotPassword()">Password dimenticata?</span></div>
     <button class="btn-primary btn-full" onclick="login()">Accedi</button>
     <div style="margin-top:1.2rem;text-align:center;font-size:0.62rem;color:var(--muted)">
-      Demo rapida: <span style="color:var(--gold);cursor:pointer" onclick="loginDemo('admin')">Admin</span> · <span style="color:#ff9f43;cursor:pointer" onclick="loginDemo('gym')">Palestra</span> · <span style="color:var(--blue);cursor:pointer" onclick="loginDemo('pt')">PT</span> · <span style="color:var(--accent);cursor:pointer" onclick="loginDemo('user')">Utente</span>
+      Demo: <span style="color:var(--gold);cursor:pointer" onclick="loginDemo('admin')">Admin</span> · <span style="color:#ff9f43;cursor:pointer" onclick="loginDemo('gym')">Palestra</span> · <span style="color:var(--blue);cursor:pointer" onclick="loginDemo('pt')">PT</span> · <span style="color:var(--accent);cursor:pointer" onclick="loginDemo('user')">Utente</span>
     </div>
   </div>
-
-  <!-- REGISTER -->
   <div id="registerForm" style="display:none">
     <div class="fr2">
       <div class="fg"><label>Nome *</label><input class="inp" type="text" id="rNome" placeholder="Mario"></div>
@@ -43,8 +42,8 @@
     <div class="fg"><label>Password *</label><input class="inp" type="password" id="rPwd" placeholder="Minimo 6 caratteri"></div>
     <div class="fg"><label>Telefono</label><input class="inp" type="tel" id="rTel" placeholder="+39 333 1234567"></div>
     <div class="fr3">
-      <div class="fg"><label>Altezza (cm)</label><input class="inp" type="number" id="rAlt" placeholder="175"></div>
-      <div class="fg"><label>Peso (kg)</label><input class="inp" type="number" step=".5" id="rPeso" placeholder="75"></div>
+      <div class="fg"><label>Altezza cm</label><input class="inp" type="number" id="rAlt" placeholder="175"></div>
+      <div class="fg"><label>Peso kg</label><input class="inp" type="number" step=".5" id="rPeso" placeholder="75"></div>
       <div class="fg"><label>Grasso %</label><input class="inp" type="number" step=".1" id="rGrasso" placeholder="15"></div>
     </div>
     <button class="btn-primary btn-full" onclick="register()">Crea Account</button>
@@ -68,6 +67,21 @@
   <div id="appContent" class="section-anim"></div>
 </div>
 
+<!-- ══════ MOBILE BOTTOM NAV ══════ -->
+<div id="mobileNav">
+  <div class="mnav-items" id="mobileNavItems"></div>
+</div>
+
+<!-- ══════ EXERCISE PICKER (fullscreen mobile) ══════ -->
+<div id="exPickerModal">
+  <div class="picker-header">
+    <input id="pickerSearch" placeholder="Cerca esercizio..." oninput="pickerSearch()" type="search">
+    <button class="picker-close" onclick="closeExPicker()">✕</button>
+  </div>
+  <div class="picker-filters" id="pickerChips"></div>
+  <div class="picker-list" id="pickerList"></div>
+</div>
+
 <!-- ══════ MODAL ══════ -->
 <div id="modalBg" onclick="if(event.target===this)closeModal()">
   <div id="modalBox">
@@ -86,11 +100,45 @@
 <script src="pages.js"></script>
 
 <script>
+// ── MOBILE NAV BUILD ────────────────────────────────────────
+const MOBILE_NAV = {
+  admin: [{id:'home',l:'Home',ic:'🏠'},{id:'users',l:'Utenti',ic:'👥'},{id:'exercises',l:'Esercizi',ic:'💪'},{id:'gym',l:'Palestra',ic:'🏋️'},{id:'profile',l:'Profilo',ic:'👤'}],
+  gym:   [{id:'home',l:'Home',ic:'🏠'},{id:'rooms',l:'Sale',ic:'🚪'},{id:'room_cal',l:'Corsi',ic:'📅'},{id:'pts',l:'PT',ic:'🏋️'},{id:'profile',l:'Profilo',ic:'👤'}],
+  pt:    [{id:'home',l:'Home',ic:'🏠'},{id:'clients',l:'Clienti',ic:'👥'},{id:'templates',l:'Schede',ic:'📋'},{id:'feedback',l:'Feedback',ic:'💬'},{id:'profile',l:'Profilo',ic:'👤'}],
+  user:  [{id:'home',l:'Home',ic:'🏠'},{id:'free_workout',l:'Libero',ic:'🆓'},{id:'today',l:'Oggi',ic:'📋'},{id:'stats',l:'Stats',ic:'📊'},{id:'profile',l:'Profilo',ic:'👤'}],
+};
+
+function buildMobileNav() {
+  const items = MOBILE_NAV[window.CU.ruolo] || [];
+  document.getElementById('mobileNavItems').innerHTML = items.map(n =>
+    `<button class="mnav-btn" data-page="${n.id}" onclick="router('${n.id}')">
+      <span class="mnav-icon">${n.ic}</span>${n.l}
+    </button>`
+  ).join('');
+}
+
+// Patch setNav to also update mobile nav
+const _origSetNav = window.setNav;
+window.setNav = function(p) {
+  if (_origSetNav) _origSetNav(p);
+  document.querySelectorAll('.mnav-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.page === p)
+  );
+};
+
+// Patch doLogin to also build mobile nav
+const _origDoLogin = window.doLogin;
+window.doLogin = function(u) {
+  _origDoLogin(u);
+  buildMobileNav();
+};
+
+// ── BOOTSTRAP ─────────────────────────────────────────────
 (async function init() {
   initSupabase();
   await seedDefaultData();
   const loggedIn = await tryAutoLogin();
-  if (loggedIn) return;
+  if (loggedIn) buildMobileNav();
   setTimeout(checkImport, 500);
   await seedDemoAccounts();
 })();
@@ -106,18 +154,18 @@ async function seedDemoAccounts() {
   ];
   const created = [];
   for (const d of demos) created.push(await DB.createUser(d));
-  const pt = created.find(u=>u.ruolo==='pt'), user = created.find(u=>u.ruolo==='user');
+  const pt=created.find(u=>u.ruolo==='pt'), user=created.find(u=>u.ruolo==='user');
   if (pt && user) {
-    await DB.updateUser(user.id, {pt_id: pt.id});
-    const exs = await DB.getExercises();
-    const find = name => exs.find(e=>e.name===name);
-    const sched = {
+    await DB.updateUser(user.id,{pt_id:pt.id});
+    const exs=await DB.getExercises();
+    const find=name=>exs.find(e=>e.name===name);
+    const sched={
       lun:[{id:uid(),exId:find('Panca Piana')?.id,name:'Panca Piana',muscleGroup:'Petto',emoji:'🏋️',serie:3,reps:10,weight:60,note:'Buona forma'},{id:uid(),exId:find('Squat')?.id,name:'Squat',muscleGroup:'Gambe',emoji:'🦵',serie:3,reps:12,weight:50,note:''},{id:uid(),exId:find('Plank')?.id,name:'Plank',muscleGroup:'Addominali',emoji:'🔥',serie:3,reps:30,weight:0,note:'30s a serie'}],
       mer:[{id:uid(),exId:find('Lat Machine')?.id,name:'Lat Machine',muscleGroup:'Dorsali',emoji:'🎰',serie:3,reps:10,weight:55,note:''},{id:uid(),exId:find('Curl con Bilanciere')?.id,name:'Curl con Bilanciere',muscleGroup:'Bicipiti',emoji:'🦾',serie:3,reps:12,weight:25,note:''},{id:uid(),exId:find('Lento Avanti')?.id,name:'Lento Avanti',muscleGroup:'Spalle',emoji:'🏔️',serie:3,reps:10,weight:30,note:''}],
       ven:[{id:uid(),exId:find('Panca Inclinata')?.id,name:'Panca Inclinata',muscleGroup:'Petto',emoji:'📐',serie:3,reps:10,weight:50,note:''},{id:uid(),exId:find('Leg Press')?.id,name:'Leg Press',muscleGroup:'Gambe',emoji:'🦾',serie:3,reps:12,weight:100,note:''},{id:uid(),exId:find('Estensioni Tricipiti')?.id,name:'Estensioni Tricipiti',muscleGroup:'Tricipiti',emoji:'⬆️',serie:3,reps:12,weight:20,note:''}],
       mar:[],gio:[],sab:[],dom:[]
     };
-    const tpl = await DB.createTemplate({pt_id:pt.id,nome:'Scheda A – Principiante',description:'3 giorni a settimana, full body',schedule:sched});
+    const tpl=await DB.createTemplate({pt_id:pt.id,nome:'Scheda A – Principiante',description:'3 giorni a settimana, full body',schedule:sched});
     await DB.upsertAssignment({pt_id:pt.id,user_id:user.id,template_id:tpl.id,template_name:tpl.nome,start_date:new Date().toISOString().split('T')[0],schedule:sched});
   }
   await DB.saveGym({name:'Centro Sportivo FitLife',logo_url:'',address:'Via Roma 1, Milano',phone:'+39 02 1234567',email:'info@fitlife.it',vat_id:'IT12345678901',description:'La palestra più moderna di Milano'});
