@@ -5,17 +5,29 @@
 // ══════════════════════════════════════════════════════════════
 
 const USE_SUPABASE = () =>
-  window.SUPABASE_URL && window.SUPABASE_URL !== 'YOUR_SUPABASE_URL' && window.supabase;
+  window.SUPABASE_URL && window.SUPABASE_URL !== 'YOUR_SUPABASE_URL' && window.sbClient;
 
 // ── INIZIALIZZA SUPABASE ─────────────────────────────────────
 function initSupabase() {
-  if (window.SUPABASE_URL && window.SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
-    try {
-      window.sbClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
-      console.log('✅ Supabase connesso');
-    } catch(e) {
-      console.warn('⚠️ Supabase non disponibile, uso localStorage', e);
-    }
+  if (!window.SUPABASE_URL || window.SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+    console.warn('⚠️ Supabase non configurato — uso localStorage');
+    return;
+  }
+  if (!window.supabase) {
+    console.error('❌ Libreria Supabase non caricata (CDN fallito?)');
+    return;
+  }
+  try {
+    window.sbClient = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
+    console.log('✅ Supabase connesso a', window.SUPABASE_URL);
+    // Test rapido di connessione
+    window.sbClient.from('profiles').select('count', {count:'exact',head:true})
+      .then(({error}) => {
+        if (error) console.error('❌ Supabase errore DB:', error.message);
+        else console.log('✅ Supabase DB raggiungibile');
+      });
+  } catch(e) {
+    console.error('❌ Supabase createClient fallito:', e);
   }
 }
 
