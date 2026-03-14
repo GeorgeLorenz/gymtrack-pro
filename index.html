@@ -25,7 +25,7 @@
 <!-- ══════════════════════════════════════════════════════════
      AUTH SCREEN
      ══════════════════════════════════════════════════════════ -->
-<div id="authScreen" style="display:none">
+<div id="authScreen">
 <div class="auth-card">
   <div class="auth-logo">GYM<span>TRACK</span><sup> PRO</sup></div>
 
@@ -133,14 +133,11 @@
   // Seed default exercise library if empty
   await seedDefaultData();
 
-  // Show auth screen
+  // Show auth screen (already visible via CSS, but ensure it)
   document.getElementById('authScreen').style.display = 'flex';
 
   // Try auto-login from session
   const loggedIn = await tryAutoLogin();
-  if (!loggedIn) {
-    document.getElementById('authScreen').style.display = 'flex';
-  }
 
   // Handle QR import param
   setTimeout(checkImport, 500);

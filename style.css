@@ -17,7 +17,7 @@ a { color: var(--accent); }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--muted2); }
 
-/* ── AUTH ───────────────────────────────────────────────────── */
+/* ── AUTH SCREEN visible by default ─────────────────────────── */
 #authScreen {
   min-height: 100vh; display: flex; align-items: center;
   justify-content: center; padding: 1rem;
