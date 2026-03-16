@@ -8,9 +8,8 @@
 // 3. Incollali qui sotto
 // 4. Vai su SQL Editor e incolla il contenuto di supabase/schema.sql
 
-window.SUPABASE_URL  = 'https://ohdpdwxgyqwjzpknvkcd.supabase.co';   // es: https://xxxxx.supabase.co
-window.SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oZHBkd3hneXF3anpwa252a2NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MDQ3ODAsImV4cCI6MjA4OTA4MDc4MH0.il9lQl3ef2-eRLiRYo5yJ2AdR_WZ1MJ2yeoj3Bl5bXs
-'; // chiave pubblica anon
+window.SUPABASE_URL = `https://ohdpdwxgyqwjzpknvkcd.supabase.co`;
+window.SUPABASE_KEY = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9oZHBkd3hneXF3anpwa252a2NkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MDQ3ODAsImV4cCI6MjA4OTA4MDc4MH0.il9lQl3ef2-eRLiRYo5yJ2AdR_WZ1MJ2yeoj3Bl5bXs`;
 
 // ── APP CONSTANTS ────────────────────────────────────────────
 window.APP_VERSION = '2.0.0';
