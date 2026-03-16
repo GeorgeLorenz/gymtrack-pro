@@ -45,6 +45,7 @@ create table public.exercises (
   emoji         text default '🏋️',
   description   text,
   image_url     text,
+  video_url     text,
   is_default    boolean default false,
   created_by    uuid references public.profiles(id) on delete set null,
   created_at    timestamptz default now()

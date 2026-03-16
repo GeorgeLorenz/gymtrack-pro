@@ -53,9 +53,11 @@ function uid() {
 // ── SEED DATI DEFAULT ────────────────────────────────────────
 async function seedDefaultData() {
   let exs = lsGet('exercises');
-  if (!exs.length) {
-    exs = window.DEFAULT_EXERCISES.map(e => ({ ...e, id: uid(), created_at: new Date().toISOString() }));
-    lsSet('exercises', exs);
+  // Refresh if exercises are missing or don't have video_url field yet
+  if (!exs.length || (exs.length && exs[0].video_url === undefined)) {
+    const custom = exs.filter(e => !e.is_default); // preserve custom
+    const defaults = window.DEFAULT_EXERCISES.map(e => ({ ...e, id: uid(), created_at: new Date().toISOString() }));
+    lsSet('exercises', [...defaults, ...custom]);
   }
   if (!lsGym().name) {
     lsSetGym({ id: uid(), name: 'La Mia Palestra', logo_url:'', address:'', phone:'', email:'', vat_id:'', description:'' });

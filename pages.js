@@ -271,10 +271,11 @@ async function filterExercises(exs) {
         <div class="ex-lib-name">${esc(e.name)}</div>
         <div class="ex-lib-muscle">${e.muscle_group}</div>
         ${e.description ? `<div style="font-size:.62rem;color:var(--muted);margin-top:.2rem">${esc(e.description)}</div>` : ''}
-        <div class="flex-gap" style="margin-top:.6rem">
+        ${e.video_url ? `<a href="${esc(e.video_url)}" target="_blank" style="font-size:.62rem;color:var(--blue);display:block;margin-top:.3rem">▶ Guarda video</a>` : ''}
+        <div class="flex-gap" style="margin-top:.5rem">
           ${e.is_default ? '<span class="tag" style="font-size:.5rem">DEFAULT</span>' : '<span class="tag accent" style="font-size:.5rem">CUSTOM</span>'}
-          ${!e.is_default && isPT ? `<button class="btn-secondary btn-sm" onclick="editExerciseModal('${e.id}')">✏️</button>
-            <button class="btn-danger btn-sm" onclick="delExercise('${e.id}')">✕</button>` : ''}
+          ${isPT ? `<button class="btn-secondary btn-sm" onclick="editExerciseModal('${e.id}')">✏️</button>` : ''}
+          ${!e.is_default && isPT ? `<button class="btn-danger btn-sm" onclick="delExercise('${e.id}')">✕</button>` : ''}
         </div>
       </div>
     </div>`).join('')}</div>`
@@ -283,20 +284,23 @@ async function filterExercises(exs) {
 
 function addExerciseModal() {
   openModal('Nuovo Esercizio', `
-  <div class="fg"><label>Nome *</label><input class="inp" id="ne_name" placeholder="Nome esercizio"></div>
+  <div class="fg"><label>Nome *</label><input class="inp" id="ne_name" placeholder="Es: Cable Fly"></div>
   <div class="fr2">
     <div class="fg"><label>Gruppo Muscolare *</label><select class="inp" id="ne_muscle">
       ${window.MUSCLES.map(m => `<option>${m}</option>`).join('')}
     </select></div>
     <div class="fg"><label>Emoji</label><input class="inp" id="ne_emoji" value="🏋️" maxlength="4"></div>
   </div>
-  <div class="fg"><label>Descrizione</label><textarea class="inp" id="ne_desc" rows="2"></textarea></div>
-  <div class="fg"><label>Immagine (URL o upload)</label>
+  <div class="fg"><label>Descrizione</label><textarea class="inp" id="ne_desc" rows="2" placeholder="Breve descrizione dell'esercizio"></textarea></div>
+  <div class="fg"><label>Foto (URL o upload)</label>
     <div style="display:flex;gap:.5rem">
       <input class="inp" id="ne_img" placeholder="https://..." style="flex:1" oninput="previewImg('ne_img','ne_prev')">
-      <label class="btn-secondary btn-sm" style="cursor:pointer">📁<input type="file" accept="image/*" style="display:none" onchange="uploadImg(this,'ne_img','ne_prev')"></label>
+      <label class="btn-secondary btn-sm" style="cursor:pointer">📷<input type="file" accept="image/*" style="display:none" onchange="uploadImg(this,'ne_img','ne_prev')"></label>
     </div>
     <div id="ne_prev" style="margin-top:.5rem"></div>
+  </div>
+  <div class="fg"><label>Video YouTube (URL)</label>
+    <input class="inp" id="ne_video" placeholder="https://youtube.com/watch?v=...">
   </div>
   <button class="btn-primary btn-full" style="margin-top:.5rem" onclick="saveNewExercise()">Salva Esercizio</button>`);
 }
@@ -319,7 +323,7 @@ function uploadImg(input, inputId, prevId) {
 async function saveNewExercise() {
   const name = v('ne_name').trim();
   if (!name) { toast('Inserisci il nome', 'error'); return; }
-  await DB.createExercise({ name, muscle_group: v('ne_muscle'), emoji: v('ne_emoji')||'🏋️', description: v('ne_desc'), image_url: v('ne_img'), is_default: false, created_by: window.CU.id });
+  await DB.createExercise({ name, muscle_group: v('ne_muscle'), emoji: v('ne_emoji')||'🏋️', description: v('ne_desc'), image_url: v('ne_img'), video_url: v('ne_video'), is_default: false, created_by: window.CU.id });
   closeModal(); renderExercises(); toast('Esercizio aggiunto', 'success');
 }
 
@@ -334,19 +338,23 @@ async function editExerciseModal(id) {
     <div class="fg"><label>Emoji</label><input class="inp" id="ee_emoji" value="${e.emoji||'🏋️'}" maxlength="4"></div>
   </div>
   <div class="fg"><label>Descrizione</label><textarea class="inp" id="ee_desc" rows="2">${esc(e.description||'')}</textarea></div>
-  <div class="fg"><label>Immagine</label>
+  <div class="fg"><label>Foto</label>
     ${e.image_url ? `<img src="${e.image_url}" style="width:100%;max-height:100px;object-fit:cover;margin-bottom:.5rem;border:1px solid var(--border)">` : ''}
     <div style="display:flex;gap:.5rem">
-      <input class="inp" id="ee_img" value="${e.image_url||''}" style="flex:1">
-      <label class="btn-secondary btn-sm" style="cursor:pointer">📁<input type="file" accept="image/*" style="display:none" onchange="uploadImg(this,'ee_img','ee_prev')"></label>
+      <input class="inp" id="ee_img" value="${e.image_url||''}" style="flex:1" oninput="previewImg('ee_img','ee_prev')">
+      <label class="btn-secondary btn-sm" style="cursor:pointer">📷<input type="file" accept="image/*" style="display:none" onchange="uploadImg(this,'ee_img','ee_prev')"></label>
     </div>
     <div id="ee_prev"></div>
+  </div>
+  <div class="fg"><label>Video YouTube (URL)</label>
+    <input class="inp" id="ee_video" value="${esc(e.video_url||'')}" placeholder="https://youtube.com/watch?v=...">
+    ${e.video_url ? `<a href="${esc(e.video_url)}" target="_blank" style="font-size:.65rem;color:var(--blue);margin-top:.3rem;display:inline-block">▶ Guarda video attuale</a>` : ''}
   </div>
   <button class="btn-primary btn-full" style="margin-top:.5rem" onclick="saveExEdit('${id}')">Salva</button>`);
 }
 
 async function saveExEdit(id) {
-  await DB.updateExercise(id, { name: v('ee_name'), muscle_group: v('ee_muscle'), emoji: v('ee_emoji'), description: v('ee_desc'), image_url: v('ee_img') });
+  await DB.updateExercise(id, { name: v('ee_name'), muscle_group: v('ee_muscle'), emoji: v('ee_emoji'), description: v('ee_desc'), image_url: v('ee_img'), video_url: v('ee_video') });
   closeModal(); renderExercises(); toast('Salvato', 'success');
 }
 
