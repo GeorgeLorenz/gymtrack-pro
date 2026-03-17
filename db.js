@@ -7,6 +7,15 @@
 const USE_SUPABASE = () =>
   window.SUPABASE_URL && window.SUPABASE_URL !== 'YOUR_SUPABASE_URL' && window.sbClient;
 
+// Wrapper con timeout 5s su ogni query Supabase
+// Se scade, lancia un errore e il chiamante cade nel fallback localStorage
+const SB_TIMEOUT = 5000;
+async function sbQ(queryPromise) {
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('Supabase timeout')), SB_TIMEOUT));
+  return Promise.race([queryPromise, timeout]);
+}
+
 // ── INIZIALIZZA SUPABASE ─────────────────────────────────────
 function initSupabase() {
   if (!window.SUPABASE_URL || window.SUPABASE_URL === 'YOUR_SUPABASE_URL') {
@@ -54,13 +63,6 @@ function uid() {
 async function seedDefaultData() {
   if (USE_SUPABASE()) {
     try {
-      // Aggiungi colonna video_url se manca (ignore error se esiste già)
-      try {
-        await window.sbClient.rpc('exec_sql', {
-          sql: `ALTER TABLE exercises ADD COLUMN IF NOT EXISTS video_url text DEFAULT '';`
-        });
-      } catch(e) { /* ignora — la colonna potrebbe già esistere */ }
-
       // Controlla se ci sono già esercizi
       const { data: existing, error } = await window.sbClient
         .from('exercises').select('id').limit(1);
@@ -120,8 +122,10 @@ const DB = {
   // ── USERS ─────────────────────────────────────────────────
   async getUsers() {
     if (USE_SUPABASE()) {
-      const { data } = await window.sbClient.from('profiles').select('*').order('created_at');
-      return data || [];
+      try {
+        const { data } = await sbQ(window.sbClient.from('profiles').select('*').order('created_at'));
+        return data || [];
+      } catch(e) { console.warn('getUsers fallback:', e.message); }
     }
     return lsGet('profiles');
   },
@@ -171,8 +175,10 @@ const DB = {
   // ── GYM ───────────────────────────────────────────────────
   async getGym() {
     if (USE_SUPABASE()) {
-      const { data } = await window.sbClient.from('gym_profile').select('*').limit(1).single();
-      return data || {};
+      try {
+        const { data } = await sbQ(window.sbClient.from('gym_profile').select('*').limit(1).single());
+        return data || {};
+      } catch(e) { console.warn('getGym fallback:', e.message); }
     }
     return lsGym();
   },
@@ -239,10 +245,12 @@ const DB = {
   // ── TEMPLATES ─────────────────────────────────────────────
   async getTemplates(ptId) {
     if (USE_SUPABASE()) {
-      let q = window.sbClient.from('workout_templates').select('*');
-      if (ptId) q = q.eq('pt_id', ptId);
-      const { data } = await q.order('created_at', { ascending: false });
-      return data || [];
+      try {
+        let q = window.sbClient.from('workout_templates').select('*');
+        if (ptId) q = q.eq('pt_id', ptId);
+        const { data } = await sbQ(q.order('created_at', { ascending: false }));
+        return data || [];
+      } catch(e) { console.warn('getTemplates fallback:', e.message); }
     }
     const all = lsGet('templates');
     return ptId ? all.filter(t => t.pt_id === ptId) : all;
@@ -279,11 +287,13 @@ const DB = {
   // ── ASSIGNMENTS ───────────────────────────────────────────
   async getAssignments(filter = {}) {
     if (USE_SUPABASE()) {
-      let q = window.sbClient.from('workout_assignments').select('*');
-      if (filter.userId) q = q.eq('user_id', filter.userId);
-      if (filter.ptId)   q = q.eq('pt_id', filter.ptId);
-      const { data } = await q;
-      return data || [];
+      try {
+        let q = window.sbClient.from('workout_assignments').select('*');
+        if (filter.userId) q = q.eq('user_id', filter.userId);
+        if (filter.ptId)   q = q.eq('pt_id', filter.ptId);
+        const { data } = await sbQ(q);
+        return data || [];
+      } catch(e) { console.warn('getAssignments fallback:', e.message); }
     }
     let all = lsGet('assignments');
     if (filter.userId) all = all.filter(a => a.user_id === filter.userId);
@@ -319,13 +329,15 @@ const DB = {
   // ── SESSIONS ──────────────────────────────────────────────
   async getSessions(userId, limit = 100) {
     if (USE_SUPABASE()) {
-      const { data } = await window.sbClient
-        .from('workout_sessions')
-        .select('*, session_exercises(*)')
-        .eq('user_id', userId)
-        .order('session_date', { ascending: false })
-        .limit(limit);
-      return data || [];
+      try {
+        const { data } = await sbQ(window.sbClient
+          .from('workout_sessions')
+          .select('*, session_exercises(*)')
+          .eq('user_id', userId)
+          .order('session_date', { ascending: false })
+          .limit(limit));
+        return data || [];
+      } catch(e) { console.warn('getSessions fallback:', e.message); }
     }
     const sessions = lsGet('sessions').filter(s => s.user_id === userId)
       .sort((a, b) => b.session_date.localeCompare(a.session_date))
@@ -336,13 +348,15 @@ const DB = {
 
   async getSessionByDate(userId, date) {
     if (USE_SUPABASE()) {
-      const { data } = await window.sbClient
-        .from('workout_sessions')
-        .select('*, session_exercises(*)')
-        .eq('user_id', userId)
-        .eq('session_date', date)
-        .maybeSingle();
-      return data;
+      try {
+        const { data } = await sbQ(window.sbClient
+          .from('workout_sessions')
+          .select('*, session_exercises(*)')
+          .eq('user_id', userId)
+          .eq('session_date', date)
+          .maybeSingle());
+        return data;
+      } catch(e) { console.warn('getSessionByDate fallback:', e.message); }
     }
     const s = lsGet('sessions').find(s => s.user_id === userId && s.session_date === date);
     if (!s) return null;
@@ -418,8 +432,10 @@ const DB = {
   // ── ROOMS ─────────────────────────────────────────────────
   async getRooms() {
     if (USE_SUPABASE()) {
-      const { data } = await window.sbClient.from('rooms').select('*').order('name');
-      return data || [];
+      try {
+        const { data } = await sbQ(window.sbClient.from('rooms').select('*').order('name'));
+        return data || [];
+      } catch(e) { console.warn('getRooms fallback:', e.message); }
     }
     return lsGet('rooms');
   },
