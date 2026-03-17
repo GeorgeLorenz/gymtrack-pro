@@ -52,10 +52,58 @@ function uid() {
 
 // ── SEED DATI DEFAULT ────────────────────────────────────────
 async function seedDefaultData() {
+  if (USE_SUPABASE()) {
+    try {
+      // Aggiungi colonna video_url se manca (ignore error se esiste già)
+      try {
+        await window.sbClient.rpc('exec_sql', {
+          sql: `ALTER TABLE exercises ADD COLUMN IF NOT EXISTS video_url text DEFAULT '';`
+        });
+      } catch(e) { /* ignora — la colonna potrebbe già esistere */ }
+
+      // Controlla se ci sono già esercizi
+      const { data: existing, error } = await window.sbClient
+        .from('exercises').select('id').limit(1);
+
+      if (error) throw error;
+
+      if (!existing || existing.length === 0) {
+        console.log('📦 Seeding esercizi su Supabase...');
+        // Inserisce senza video_url per compatibilità con schema vecchio
+        const batch = window.DEFAULT_EXERCISES.map(e => ({
+          name: e.name,
+          muscle_group: e.muscle_group,
+          emoji: e.emoji || '🏋️',
+          description: e.description || '',
+          image_url: e.image_url || '',
+          is_default: true,
+          created_by: null
+        }));
+        // Tenta prima con video_url
+        let insertError = null;
+        for (let i = 0; i < batch.length; i += 20) {
+          const batchWithVideo = batch.slice(i, i+20).map(e => ({
+            ...e, video_url: ''
+          }));
+          const { error: e1 } = await window.sbClient.from('exercises').insert(batchWithVideo);
+          if (e1) {
+            // Fallback senza video_url
+            const { error: e2 } = await window.sbClient.from('exercises').insert(batch.slice(i, i+20));
+            if (e2) insertError = e2;
+          }
+        }
+        if (insertError) throw insertError;
+        console.log('✅ Esercizi inseriti su Supabase');
+      }
+    } catch(e) {
+      console.warn('⚠️ Seed Supabase fallito, uso localStorage', e.message);
+    }
+  }
+
+  // Seed localStorage (fallback o modalità offline)
   let exs = lsGet('exercises');
-  // Refresh if exercises are missing or don't have video_url field yet
-  if (!exs.length || (exs.length && exs[0].video_url === undefined)) {
-    const custom = exs.filter(e => !e.is_default); // preserve custom
+  if (!exs.length || exs[0].video_url === undefined) {
+    const custom = exs.filter(e => !e.is_default);
     const defaults = window.DEFAULT_EXERCISES.map(e => ({ ...e, id: uid(), created_at: new Date().toISOString() }));
     lsSet('exercises', [...defaults, ...custom]);
   }
@@ -145,8 +193,17 @@ const DB = {
   // ── EXERCISES ─────────────────────────────────────────────
   async getExercises() {
     if (USE_SUPABASE()) {
-      const { data } = await window.sbClient.from('exercises').select('*').order('muscle_group').order('name');
-      return data || [];
+      try {
+        const timeout = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 4000));
+        const query = window.sbClient
+          .from('exercises').select('*').order('muscle_group').order('name');
+        const { data, error } = await Promise.race([query, timeout]);
+        if (error) throw error;
+        if (data && data.length > 0) return data;
+      } catch(e) {
+        console.warn('getExercises Supabase error, fallback localStorage:', e.message);
+      }
     }
     return lsGet('exercises');
   },
