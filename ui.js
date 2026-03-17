@@ -36,7 +36,8 @@ const PAGE_MAP = {
   today:        () => renderToday(),
   calendar:     () => renderCalendar(),
   stats:        () => renderStats(),
-  history:      () => renderHistory(),
+  history:        () => renderHistory(),
+  session_detail: () => renderSessionDetail(),
   profile:      () => renderProfile(),
 };
 

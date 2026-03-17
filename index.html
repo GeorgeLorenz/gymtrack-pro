@@ -55,7 +55,7 @@
 <!-- ══════ APP SHELL ══════ -->
 <div id="appShell">
   <header>
-    <div class="logo">GYM<span>TRACK</span><sup> PRO</sup></div>
+    <div class="logo" style="cursor:pointer" onclick="router('home')">GYM<span>TRACK</span><sup> PRO</sup></div>
     <div class="huser">
       <div id="headerAvatar" class="header-avatar"></div>
       <div id="headerName" style="font-size:0.72rem;color:var(--muted)"></div>
@@ -72,15 +72,8 @@
   <div class="mnav-items" id="mobileNavItems"></div>
 </div>
 
-<!-- ══════ EXERCISE PICKER (fullscreen mobile) ══════ -->
-<div id="exPickerModal">
-  <div class="picker-header">
-    <input id="pickerSearch" placeholder="Cerca esercizio..." oninput="pickerSearch()" type="search">
-    <button class="picker-close" onclick="closeExPicker()">✕</button>
-  </div>
-  <div class="picker-filters" id="pickerChips"></div>
-  <div class="picker-list" id="pickerList"></div>
-</div>
+
+
 
 <!-- ══════ MODAL ══════ -->
 <div id="modalBg" onclick="if(event.target===this)closeModal()">
@@ -95,7 +88,7 @@
 <script src="db.js"></script>
 <script src="ui.js"></script>
 <script src="auth.js"></script>
-<script src="workout.js"></script>
+<script src="free_workout.js"></script>
 <script src="stats.js"></script>
 <script src="pages.js"></script>
 

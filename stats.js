@@ -25,44 +25,62 @@ async function renderStats() {
   body.style.display = 'block';
 
   if (!stats.totalSessions) {
-    body.innerHTML = '<div class="empty">Nessun allenamento registrato ancora.<br>Inizia subito dalla sezione "Allenamento Libero"!</div>';
+    body.innerHTML = '<div class="empty">Nessun allenamento registrato.<br>Inizia dalla sezione "Allenamento Libero"!</div>';
     return;
   }
 
   body.innerHTML = `
   <!-- KPI -->
-  <div class="grid-4">
-    <div class="stat-box"><div class="stat-label">Sessioni Totali</div><div class="stat-val">${stats.totalSessions}</div></div>
-    <div class="stat-box"><div class="stat-label">Volume Totale</div><div class="stat-val" style="font-size:1.6rem">${(stats.totalVolume/1000).toFixed(1)}</div><div class="stat-unit">tonnellate</div></div>
-    <div class="stat-box"><div class="stat-label">Esercizi Completati</div><div class="stat-val">${stats.totalExercisesDone}</div></div>
-    <div class="stat-box"><div class="stat-label">Media Volume/Sett.</div><div class="stat-val" style="font-size:1.6rem">${calcAvgWeeklyVolume(stats)}</div><div class="stat-unit">kg</div></div>
-  </div>
-
-  <!-- CHARTS ROW 1 -->
-  <div class="grid-2" style="margin-bottom:1.5rem">
-    <div class="card"><div class="card-title">Volume Settimanale (kg)</div><canvas id="chartVolume" height="200"></canvas></div>
-    <div class="card"><div class="card-title">Sessioni per Settimana</div><canvas id="chartSessions" height="200"></canvas></div>
-  </div>
-
-  <!-- CHARTS ROW 2 -->
-  <div class="grid-2" style="margin-bottom:1.5rem">
-    <div class="card"><div class="card-title">Gruppi Muscolari Allenati</div><canvas id="chartMuscles" height="200"></canvas></div>
-    <div class="card">
-      <div class="card-title">Progressione Esercizio</div>
-      <div class="flex-gap" style="margin-bottom:1rem">
-        <select class="dd" id="exProgressSel" onchange="renderExerciseProgress()" style="flex:1">
-          ${Object.keys(stats.exerciseProgress).map(n => `<option>${n}</option>`).join('')}
-        </select>
-      </div>
-      <canvas id="chartProgress" height="170"></canvas>
+  <div class="grid-4" style="margin-bottom:1.2rem">
+    <div class="stat-box">
+      <div class="stat-label">Sessioni</div>
+      <div class="stat-val">${stats.totalSessions}</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Tonnellate</div>
+      <div class="stat-val" style="font-size:1.8rem">${(stats.totalVolume/1000).toFixed(1)}</div>
+      <div class="stat-unit">volume totale</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Esercizi</div>
+      <div class="stat-val">${stats.totalExercisesDone}</div>
+      <div class="stat-unit">completati</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-label">Media/Sett.</div>
+      <div class="stat-val" style="font-size:1.6rem">${calcAvgWeeklyVolume(stats)}</div>
+      <div class="stat-unit">kg volume</div>
     </div>
   </div>
 
+  <!-- VOLUME + SESSIONI stacked su mobile -->
+  <div class="card" style="margin-bottom:.8rem">
+    <div class="card-title">Volume Settimanale (kg)</div>
+    <div style="position:relative;height:180px"><canvas id="chartVolume"></canvas></div>
+  </div>
+  <div class="card" style="margin-bottom:.8rem">
+    <div class="card-title">Sessioni per Settimana</div>
+    <div style="position:relative;height:160px"><canvas id="chartSessions"></canvas></div>
+  </div>
+
+  <!-- MUSCOLI + PROGRESSIONE -->
+  <div class="card" style="margin-bottom:.8rem">
+    <div class="card-title">Gruppi Muscolari Allenati</div>
+    <div style="position:relative;height:220px"><canvas id="chartMuscles"></canvas></div>
+  </div>
+
+  <div class="card" style="margin-bottom:1.2rem">
+    <div class="card-title">Progressione Esercizio</div>
+    <select class="dd" id="exProgressSel" onchange="renderExerciseProgress()" style="width:100%;margin-bottom:.8rem">
+      ${Object.keys(stats.exerciseProgress).map(n => `<option>${n}</option>`).join('')}
+    </select>
+    <div style="position:relative;height:180px"><canvas id="chartProgress"></canvas></div>
+  </div>
+
   <!-- SESSIONI RECENTI -->
-  <div class="page-title" style="font-size:1.2rem">Sessioni Recenti</div>
+  <div style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:3px;margin-bottom:.8rem">Sessioni Recenti</div>
   ${stats.recentSessions.map(s => recentSessionCard(s)).join('')}`;
 
-  // Render charts
   setTimeout(() => {
     renderVolumeChart(stats);
     renderSessionsChart(stats);
@@ -80,19 +98,31 @@ function calcAvgWeeklyVolume(stats) {
 }
 
 function recentSessionCard(s) {
-  const exs = s.session_exercises || [];
-  const done = exs.filter(e => e.done).length;
-  const vol  = exs.reduce((sum, e) => sum + (e.done ? (e.serie||0)*(e.reps||0)*(e.weight||0) : 0), 0);
-  return `<div class="card" style="cursor:pointer" onclick="openHistLog('${s.id}')">
-    <div class="flex-between">
-      <div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:2px">${fmtDate(s.session_date)}</div>
-        <div style="font-size:0.7rem;color:var(--muted)">${s.is_free?'🆓 Libero':'📋 Scheda'} · ${exs.length} esercizi</div>
+  const exs     = s.session_exercises || [];
+  const done    = exs.filter(e => e.done).length;
+  const vol     = exs.reduce((sum,e) => sum+(e.done?(e.serie||0)*(e.reps||0)*(e.weight||0):0), 0);
+  const muscles = [...new Set(exs.filter(e=>e.done&&e.muscle_group).map(e=>e.muscle_group))].slice(0,3);
+  const muscleColors = {
+    'Petto':'#c8f135','Dorsali':'#3d9eff','Gambe':'#ff9f43','Spalle':'#a29bfe',
+    'Bicipiti':'#fd79a8','Tricipiti':'#00b894','Addominali':'#ff3d3d','Cardio':'#fdcb6e'
+  };
+  const pct = exs.length ? Math.round(done/exs.length*100) : 0;
+  return `<div class="session-row" onclick="openSessionDetail('${s.id}')">
+    <div class="session-row-left">
+      <div class="session-date-block">
+        <div class="session-day">${new Date(s.session_date+'T00:00:00').getDate()}</div>
+        <div class="session-month">${new Date(s.session_date+'T00:00:00').toLocaleDateString('it-IT',{month:'short'})}</div>
       </div>
-      <div class="flex-gap">
-        <span class="tag ${done===exs.length&&done>0?'accent':''}">${done}/${exs.length}</span>
-        ${vol ? `<span class="tag blue">⚖️ ${vol.toLocaleString('it-IT')} kg</span>` : ''}
+      <div class="session-info">
+        <div class="session-type">${s.is_free?'🆓 Libero':'📋 '+esc(s.template_name||'')}</div>
+        <div class="session-muscles">
+          ${muscles.map(m=>`<span class="muscle-pill" style="border-color:${muscleColors[m]||'var(--border)'};color:${muscleColors[m]||'var(--muted)'}">${m}</span>`).join('')}
+        </div>
       </div>
+    </div>
+    <div class="session-row-right">
+      <div class="session-pct ${pct===100?'done':''}">${pct}%</div>
+      ${vol?`<div style="font-size:.6rem;color:var(--muted);text-align:right">${(vol/1000).toFixed(1)}t</div>`:''}
     </div>
   </div>`;
 }

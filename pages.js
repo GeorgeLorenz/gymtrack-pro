@@ -86,39 +86,88 @@ async function renderPTHome() {
 }
 
 async function renderUserHome() {
-  const asgns = await DB.getAssignments({ userId: window.CU.id });
-  const asgn  = asgns[0];
-  const dk    = window.DKEYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
-  const exs   = asgn ? (asgn.schedule[dk] || []) : [];
-  const log   = await DB.getSessionByDate(window.CU.id, today());
-  const done  = log ? log.session_exercises.filter(e => e.done).length : 0;
-  const stats = await DB.getStats(window.CU.id);
-  const pt    = window.CU.pt_id ? (await DB.getUsers()).find(u => u.id === window.CU.pt_id) : null;
-  set(`<div class="page-title">Ciao ${esc(window.CU.nome)}! <span class="page-sub">${new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'})}</span></div>
+  const asgns   = await DB.getAssignments({ userId: window.CU.id });
+  const asgn    = asgns[0];
+  const dk      = window.DKEYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+  const exs     = asgn ? (asgn.schedule[dk] || []) : [];
+  const log     = await DB.getSessionByDate(window.CU.id, today());
+  const done    = log ? log.session_exercises.filter(e => e.done).length : 0;
+  const stats   = await DB.getStats(window.CU.id);
+  const pt      = window.CU.pt_id ? (await DB.getUsers()).find(u => u.id === window.CU.pt_id) : null;
+  const sessions = await DB.getSessions(window.CU.id, 50);
+
+  // Calcola gruppi muscolari per sessione
+  function sessionMuscles(s) {
+    const exList = s.session_exercises || [];
+    const muscles = [...new Set(exList.filter(e => e.done && e.muscle_group).map(e => e.muscle_group))];
+    return muscles.slice(0, 4);
+  }
+
+  const muscleColors = {
+    'Petto':'#c8f135','Dorsali':'#3d9eff','Gambe':'#ff9f43','Spalle':'#a29bfe',
+    'Bicipiti':'#fd79a8','Tricipiti':'#00b894','Addominali':'#ff3d3d','Cardio':'#fdcb6e'
+  };
+
+  set(`
+  <div class="page-title">Ciao ${esc(window.CU.nome)}! <span class="page-sub">${new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'})}</span></div>
+
+  <!-- KPI -->
   <div class="grid-4">
-    <div class="stat-box"><div class="stat-label">Oggi</div><div class="stat-val">${exs.length}</div><div class="stat-unit">esercizi</div></div>
+    <div class="stat-box"><div class="stat-label">Oggi</div><div class="stat-val">${exs.length||'—'}</div><div class="stat-unit">${exs.length?'esercizi':'nessuna scheda'}</div></div>
     <div class="stat-box"><div class="stat-label">Completati</div><div class="stat-val">${done}</div><div class="stat-unit">su ${exs.length}</div></div>
     <div class="stat-box"><div class="stat-label">Sessioni Totali</div><div class="stat-val">${stats.totalSessions}</div></div>
-    <div class="stat-box"><div class="stat-label">Personal Trainer</div><div class="stat-val" style="font-size:.9rem;padding-top:1rem">${pt ? esc(pt.nome+' '+pt.cognome) : '—'}</div></div>
+    <div class="stat-box"><div class="stat-label">Personal Trainer</div><div class="stat-val" style="font-size:${pt?'.85rem':'1.5rem'};line-height:1.2;padding-top:${pt?'.8rem':'.5rem'}">${pt ? esc(pt.nome+' '+pt.cognome) : '—'}</div></div>
   </div>
-  <div class="grid-2" style="margin-bottom:1.5rem">
-    <div class="card" style="cursor:pointer;border-left:3px solid var(--accent)" onclick="router('free_workout')">
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:3px;color:var(--accent)">🆓 ALLENAMENTO LIBERO</div>
-      <div style="font-size:.72rem;color:var(--muted);margin-top:.3rem">Allena senza scheda assegnata</div>
+
+  <!-- AZIONI RAPIDE -->
+  <div class="grid-2" style="margin-bottom:1.2rem">
+    <div class="card" style="cursor:pointer;border-left:3px solid var(--accent);padding:1rem 1.2rem" onclick="router('free_workout')">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:3px;color:var(--accent)">🆓 ALLENAMENTO LIBERO</div>
+      <div style="font-size:.7rem;color:var(--muted);margin-top:.2rem">Allena senza scheda assegnata</div>
     </div>
-    <div class="card" style="cursor:pointer;border-left:3px solid var(--blue)" onclick="router('today')">
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:3px;color:var(--blue)">📋 SCHEDA DI OGGI</div>
-      <div style="font-size:.72rem;color:var(--muted);margin-top:.3rem">${asgn ? esc(asgn.template_name) : 'Nessuna scheda assegnata'}</div>
+    <div class="card" style="cursor:pointer;border-left:3px solid var(--blue);padding:1rem 1.2rem" onclick="router('today')">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:3px;color:var(--blue)">📋 SCHEDA DI OGGI</div>
+      <div style="font-size:.7rem;color:var(--muted);margin-top:.2rem">${asgn ? esc(asgn.template_name) : 'Nessuna scheda assegnata'}</div>
     </div>
   </div>
-  ${exs.length ? `<div class="page-title" style="font-size:1.2rem">Anteprima Oggi — ${window.DAYS[window.DKEYS.indexOf(dk)]}</div>
-  ${exs.slice(0,3).map(e => `<div class="ex-log-card ${log?.session_exercises?.find(x=>x.exercise_name===e.name)?.done?'done':''}">
-    <div class="ex-log-info">
-      <div class="ex-mini-thumb">${e.emoji||'🏋️'}</div>
-      <div><div class="ex-log-name">${esc(e.name)}</div>
-        <div class="ex-log-meta"><span>${e.muscleGroup}</span><span>${e.serie}×${e.reps}</span><span>${e.weight}kg</span></div>
-      </div>
-    </div></div>`).join('')}` : ''}`);
+
+  <!-- RIEPILOGO ALLENAMENTI -->
+  <div class="flex-between">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:3px">Riepilogo Allenamenti</div>
+    <button class="btn-secondary btn-sm" onclick="router('history')">Vedi tutti →</button>
+  </div>
+
+  ${!sessions.length
+    ? `<div class="empty">Nessun allenamento ancora. Inizia adesso!</div>`
+    : sessions.slice(0, 10).map(s => {
+        const exList = s.session_exercises || [];
+        const doneEx = exList.filter(e => e.done).length;
+        const muscles = sessionMuscles(s);
+        const vol = exList.reduce((sum,e) => sum + (e.done?(e.serie||0)*(e.reps||0)*(e.weight||0):0), 0);
+        const pct = exList.length ? Math.round(doneEx/exList.length*100) : 0;
+        return `
+        <div class="session-row" onclick="openSessionDetail('${s.id}')">
+          <div class="session-row-left">
+            <div class="session-date-block">
+              <div class="session-day">${new Date(s.session_date+'T00:00:00').getDate()}</div>
+              <div class="session-month">${new Date(s.session_date+'T00:00:00').toLocaleDateString('it-IT',{month:'short'})}</div>
+            </div>
+            <div class="session-info">
+              <div class="session-type">${s.is_free ? '🆓 Libero' : '📋 '+esc(s.template_name||'Scheda')}</div>
+              <div class="session-muscles">
+                ${muscles.length
+                  ? muscles.map(m => `<span class="muscle-pill" style="border-color:${muscleColors[m]||'var(--border)'};color:${muscleColors[m]||'var(--muted)'}">${m}</span>`).join('')
+                  : `<span style="font-size:.6rem;color:var(--muted)">Nessun esercizio completato</span>`}
+              </div>
+            </div>
+          </div>
+          <div class="session-row-right">
+            <div class="session-pct ${pct===100?'done':''}">${pct}%</div>
+            ${vol ? `<div style="font-size:.6rem;color:var(--muted);text-align:right">${(vol/1000).toFixed(1)}t</div>` : ''}
+          </div>
+        </div>`;
+      }).join('')}
+  `);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -914,39 +963,233 @@ async function openDayModal(dStr, dk) {
 // ══════════════════════════════════════════════════════════════
 // USER — HISTORY
 // ══════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// USER — HISTORY
+// ══════════════════════════════════════════════════════════════
 async function renderHistory() {
   const sessions = await DB.getSessions(window.CU.id, 200);
-  const done   = sessions.reduce((s, l) => s + (l.session_exercises||[]).filter(e => e.done).length, 0);
-  const total  = sessions.reduce((s, l) => s + (l.session_exercises||[]).length, 0);
-  set(`<div class="page-title">Storico Allenamenti</div>
-  <div class="grid-4">
-    <div class="stat-box"><div class="stat-label">Sessioni</div><div class="stat-val">${sessions.length}</div></div>
-    <div class="stat-box"><div class="stat-label">Esercizi Fatti</div><div class="stat-val">${done}</div></div>
-    <div class="stat-box"><div class="stat-label">Completamento</div><div class="stat-val" style="font-size:1.8rem">${total?Math.round(done/total*100):0}%</div></div>
-    <div class="stat-box"><div class="stat-label">Ultima Sessione</div><div class="stat-val" style="font-size:.9rem;padding-top:.8rem">${sessions[0]?fmtDate(sessions[0].session_date):'—'}</div></div>
+  const done  = sessions.reduce((s,l) => s+(l.session_exercises||[]).filter(e=>e.done).length, 0);
+  const total = sessions.reduce((s,l) => s+(l.session_exercises||[]).length, 0);
+
+  const muscleColors = {
+    'Petto':'#c8f135','Dorsali':'#3d9eff','Gambe':'#ff9f43','Spalle':'#a29bfe',
+    'Bicipiti':'#fd79a8','Tricipiti':'#00b894','Addominali':'#ff3d3d','Cardio':'#fdcb6e'
+  };
+
+  set(`<div class="flex-between">
+    <div class="page-title">Storico Allenamenti</div>
+    <div class="flex-gap">
+      <span class="tag">${sessions.filter(s=>!s.is_free).length} scheda</span>
+      <span class="tag blue">${sessions.filter(s=>s.is_free).length} liberi</span>
+    </div>
   </div>
-  <div class="flex-gap" style="margin-bottom:1rem">
-    <span class="tag">${sessions.filter(s=>!s.is_free).length} da scheda</span>
-    <span class="tag blue">${sessions.filter(s=>s.is_free).length} libere</span>
+  <div class="grid-4" style="margin-bottom:1.2rem">
+    <div class="stat-box"><div class="stat-label">Sessioni</div><div class="stat-val">${sessions.length}</div></div>
+    <div class="stat-box"><div class="stat-label">Esercizi</div><div class="stat-val">${done}</div></div>
+    <div class="stat-box"><div class="stat-label">Completamento</div><div class="stat-val" style="font-size:1.8rem">${total?Math.round(done/total*100):0}%</div></div>
+    <div class="stat-box"><div class="stat-label">Ultima</div><div class="stat-val" style="font-size:.8rem;line-height:1.2;padding-top:.8rem">${sessions[0]?fmtDate(sessions[0].session_date):'—'}</div></div>
   </div>
   ${sessions.length ? sessions.map(s => {
-    const exs  = s.session_exercises || [];
-    const d    = exs.filter(e => e.done).length;
-    const vol  = exs.reduce((sum, e) => sum + (e.done?(e.serie||0)*(e.reps||0)*(e.weight||0):0), 0);
-    return `<div class="card" style="cursor:pointer" onclick="openHistLog('${s.id}')">
-      <div class="flex-between">
-        <div>
-          <div style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;letter-spacing:2px">${fmtDate(s.session_date)}</div>
-          <div style="font-size:.7rem;color:var(--muted)">${s.is_free?'🆓':'📋'} ${esc(s.template_name||'')} · ${exs.length} esercizi${s.duration_min?` · ${s.duration_min}min`:''}</div>
+    const exs    = s.session_exercises || [];
+    const d      = exs.filter(e => e.done).length;
+    const vol    = exs.reduce((sum,e) => sum+(e.done?(e.serie||0)*(e.reps||0)*(e.weight||0):0), 0);
+    const muscles = [...new Set(exs.filter(e=>e.done&&e.muscle_group).map(e=>e.muscle_group))].slice(0,4);
+    const pct   = exs.length ? Math.round(d/exs.length*100) : 0;
+    return `
+    <div class="session-row" onclick="openSessionDetail('${s.id}')">
+      <div class="session-row-left">
+        <div class="session-date-block">
+          <div class="session-day">${new Date(s.session_date+'T00:00:00').getDate()}</div>
+          <div class="session-month">${new Date(s.session_date+'T00:00:00').toLocaleDateString('it-IT',{month:'short'})}</div>
         </div>
-        <div class="flex-gap">
-          <div style="width:60px;height:4px;background:var(--border2)"><div style="height:100%;background:var(--accent);width:${exs.length?Math.round(d/exs.length*100):0}%"></div></div>
-          <span class="tag ${d===exs.length&&d?'accent':''}">${d}/${exs.length}</span>
-          ${vol?`<span class="tag blue" style="font-size:.55rem">⚖️ ${vol.toLocaleString('it-IT')}kg</span>`:''}
+        <div class="session-info">
+          <div class="session-type">${s.is_free?'🆓 Libero':'📋 '+esc(s.template_name||'')}</div>
+          <div class="session-muscles">
+            ${muscles.length
+              ? muscles.map(m=>`<span class="muscle-pill" style="border-color:${muscleColors[m]||'var(--border)'};color:${muscleColors[m]||'var(--muted)'}">${m}</span>`).join('')
+              : `<span style="font-size:.6rem;color:var(--muted)">${exs.length} esercizi programmati</span>`}
+          </div>
         </div>
+      </div>
+      <div class="session-row-right">
+        <div class="session-pct ${pct===100?'done':''}">${pct}%</div>
+        ${vol?`<div style="font-size:.6rem;color:var(--muted);text-align:right">${(vol/1000).toFixed(1)}t</div>`:''}
+        ${s.duration_min?`<div style="font-size:.6rem;color:var(--muted);text-align:right">${s.duration_min}min</div>`:''}
       </div>
     </div>`;
   }).join('') : '<div class="empty">Nessun allenamento registrato</div>'}`);
+}
+
+// ── DETAIL PAGE — singola sessione modificabile ──────────────
+async function openSessionDetail(sessionId) {
+  // Naviga a pagina dettaglio
+  window._detailSessionId = sessionId;
+  router('session_detail');
+}
+
+async function renderSessionDetail() {
+  const sessionId = window._detailSessionId;
+  if (!sessionId) { router('history'); return; }
+
+  const sessions = await DB.getSessions(window.CU.id, 200);
+  const s = sessions.find(x => x.id === sessionId);
+  if (!s) { router('history'); return; }
+
+  const exs = s.session_exercises || [];
+  const vol = exs.reduce((sum,e) => sum+(e.done?(e.serie||0)*(e.reps||0)*(e.weight||0):0), 0);
+  const done = exs.filter(e=>e.done).length;
+  const muscles = [...new Set(exs.filter(e=>e.muscle_group).map(e=>e.muscle_group))];
+
+  const muscleColors = {
+    'Petto':'#c8f135','Dorsali':'#3d9eff','Gambe':'#ff9f43','Spalle':'#a29bfe',
+    'Bicipiti':'#fd79a8','Tricipiti':'#00b894','Addominali':'#ff3d3d','Cardio':'#fdcb6e'
+  };
+
+  set(`
+  <!-- BACK + TITLE -->
+  <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.2rem;flex-wrap:wrap">
+    <button class="btn-secondary btn-sm" onclick="history.go(-1)||router('history')">← Indietro</button>
+    <div class="page-title" style="margin-bottom:0">
+      ${new Date(s.session_date+'T00:00:00').toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
+    </div>
+  </div>
+
+  <!-- HEADER CARD -->
+  <div class="card" style="border-left:3px solid var(--accent);margin-bottom:1rem">
+    <div style="display:flex;flex-wrap:wrap;gap:1rem;align-items:flex-start;justify-content:space-between">
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:0.72rem;font-weight:700;
+          letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:.4rem">
+          ${s.is_free?'🆓 Allenamento Libero':'📋 '+esc(s.template_name||'Scheda')}
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:.6rem">
+          ${muscles.map(m=>`<span class="muscle-pill" style="border-color:${muscleColors[m]||'var(--border)'};color:${muscleColors[m]||'var(--muted)'}">${m}</span>`).join('')}
+        </div>
+        <div style="display:flex;gap:1.2rem;flex-wrap:wrap">
+          <div><span style="font-size:.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted)">Completati</span>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:var(--accent);line-height:1">${done}/${exs.length}</div></div>
+          ${vol?`<div><span style="font-size:.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted)">Volume</span>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;color:var(--blue);line-height:1">${(vol/1000).toFixed(1)}t</div></div>`:''}
+          ${s.duration_min?`<div><span style="font-size:.55rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted)">Durata</span>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;line-height:1">${s.duration_min}min</div></div>`:''}
+        </div>
+      </div>
+      <div class="flex-gap">
+        <button class="btn-danger btn-sm" onclick="deleteSession('${s.id}')">🗑 Elimina</button>
+      </div>
+    </div>
+
+    <!-- Note sessione -->
+    <div class="fg" style="margin-top:1rem;margin-bottom:0">
+      <label>Note sessione</label>
+      <textarea class="inp" id="sd_note" rows="2" placeholder="Aggiungi note...">${esc(s.session_note||'')}</textarea>
+    </div>
+    <button class="btn-secondary btn-sm" style="margin-top:.5rem"
+      onclick="saveDetailNote('${s.id}')">💾 Salva Note</button>
+  </div>
+
+  <!-- ESERCIZI MODIFICABILI -->
+  <div style="font-family:'Barlow Condensed',sans-serif;font-size:0.68rem;font-weight:700;
+    letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:.8rem">
+    Esercizi (${exs.length})
+  </div>
+  ${exs.map(e => `
+  <div class="card" id="sdex_${e.id}" style="border-left:3px solid ${e.done?'var(--accent)':'var(--border2)'}">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:.8rem;margin-bottom:.7rem">
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:.95rem;font-weight:700;
+          letter-spacing:1.5px;text-transform:uppercase">${esc(e.exercise_name)}</div>
+        <div style="font-size:.6rem;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-top:.1rem">
+          ${e.muscle_group||''}
+        </div>
+      </div>
+      <div style="display:flex;gap:.4rem;align-items:center">
+        <div onclick="sdToggleDone('${e.id}')" style="width:30px;height:30px;border:2px solid var(--border2);
+          cursor:pointer;display:flex;align-items:center;justify-content:center;
+          background:${e.done?'var(--accent)':'transparent'};
+          border-color:${e.done?'var(--accent)':'var(--border2)'};transition:all .2s"
+          id="sdcb_${e.id}">
+          ${e.done?'<span style="color:#000;font-weight:bold">✓</span>':''}
+        </div>
+      </div>
+    </div>
+    <!-- Selettori -->
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end">
+      <div style="display:flex;flex-direction:column;gap:.2rem">
+        <span style="font-size:.5rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:700">Serie</span>
+        <select class="dd" style="width:58px;padding:.4rem" onchange="sdUpdateEx('${e.id}','serie',this.value,'${s.id}')">
+          ${window.SERIE_OPTS.map(x=>`<option ${e.serie==x?'selected':''}>${x}</option>`).join('')}
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.2rem">
+        <span style="font-size:.5rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:700">Reps</span>
+        <select class="dd" style="width:62px;padding:.4rem" onchange="sdUpdateEx('${e.id}','reps',this.value,'${s.id}')">
+          ${window.REPS_OPTS.map(x=>`<option ${e.reps==x?'selected':''}>${x}</option>`).join('')}
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.2rem">
+        <span style="font-size:.5rem;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-family:'Barlow Condensed',sans-serif;font-weight:700">Peso kg</span>
+        <select class="dd" style="width:72px;padding:.4rem" onchange="sdUpdateEx('${e.id}','weight',this.value,'${s.id}')">
+          ${window.WEIGHT_OPTS.map(x=>`<option value="${x}" ${e.weight==x?'selected':''}>${x}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <!-- Note -->
+    <input class="inp" placeholder="Note..." value="${esc(e.comment||'')}"
+      style="font-size:.78rem;margin-top:.6rem"
+      onchange="sdUpdateEx('${e.id}','comment',this.value,'${s.id}')">
+    ${e.pt_reply?`<div class="pt-note-box"><span style="font-size:.58rem;color:var(--accent)">PT: </span>${esc(e.pt_reply)}</div>`:''}
+  </div>`).join('')}
+
+  ${exs.length ? `<button class="btn-primary btn-full" style="margin-top:.5rem" onclick="sdSaveAll('${s.id}')">💾 Salva Modifiche</button>` : ''}
+  `);
+}
+
+// ── SESSION DETAIL ACTIONS ────────────────────────────────────
+const _sdChanges = {}; // { exId: {field: value} }
+
+function sdUpdateEx(exId, field, value, sessionId) {
+  if (!_sdChanges[exId]) _sdChanges[exId] = {};
+  if (field === 'serie' || field === 'reps') _sdChanges[exId][field] = parseInt(value);
+  else if (field === 'weight') _sdChanges[exId][field] = parseFloat(value);
+  else _sdChanges[exId][field] = value;
+}
+
+function sdToggleDone(exId) {
+  const card = document.getElementById('sdex_'+exId);
+  const cb   = document.getElementById('sdcb_'+exId);
+  const isDone = cb?.innerHTML.includes('✓');
+  const newDone = !isDone;
+  if (!_sdChanges[exId]) _sdChanges[exId] = {};
+  _sdChanges[exId].done = newDone;
+  if (card) card.style.borderLeftColor = newDone ? 'var(--accent)' : 'var(--border2)';
+  if (cb) {
+    cb.style.background   = newDone ? 'var(--accent)' : 'transparent';
+    cb.style.borderColor  = newDone ? 'var(--accent)' : 'var(--border2)';
+    cb.innerHTML = newDone ? '<span style="color:#000;font-weight:bold">✓</span>' : '';
+  }
+}
+
+async function sdSaveAll(sessionId) {
+  try {
+    const sessions = await DB.getSessions(window.CU.id, 200);
+    const s = sessions.find(x => x.id === sessionId); if (!s) return;
+    for (const ex of (s.session_exercises||[])) {
+      const changes = _sdChanges[ex.id];
+      if (changes && Object.keys(changes).length) {
+        await DB.upsertSessionExercise({ ...ex, ...changes });
+      }
+    }
+    // Clear changes
+    Object.keys(_sdChanges).forEach(k => delete _sdChanges[k]);
+    toast('Modifiche salvate!', 'success');
+  } catch(e) { toast('Errore salvataggio', 'error'); console.error(e); }
+}
+
+async function saveDetailNote(sessionId) {
+  const note = document.getElementById('sd_note')?.value?.trim()||'';
+  await DB.updateSession(sessionId, { session_note: note });
+  toast('Note salvate', 'success');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1050,4 +1293,10 @@ window.renderFeedback = renderFeedback; window.loadFeedback = loadFeedback;
 window.replyModal = replyModal; window.saveReply = saveReply;
 window.renderCalendar = renderCalendar; window.calNav = calNav; window.openDayModal = openDayModal;
 window.renderHistory = renderHistory;
+window.openSessionDetail = openSessionDetail;
+window.renderSessionDetail = renderSessionDetail;
+window.sdUpdateEx = sdUpdateEx;
+window.sdToggleDone = sdToggleDone;
+window.sdSaveAll = sdSaveAll;
+window.saveDetailNote = saveDetailNote;
 window.renderProfile = renderProfile; window.saveProfile = saveProfile; window.changeProfilePwd = changeProfilePwd;
